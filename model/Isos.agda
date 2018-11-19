@@ -6,17 +6,64 @@ open import Agda.Builtin.Equality
 _∘_ : {A B C : Set} (g : B → C) (f : A → B) → (A → C)
 (g ∘ f) x = g (f x)
 
+cong : {A B : Set} (f : A → B) (x y : A) (p : x ≡ y) → f x ≡ f y
+cong _ _ _ refl = refl
+
+data R+ : (nl nr n : ℕ) → Set where
+  rz : R+ Z Z Z
+  rsl : (nl nr n : ℕ) (r : R+ nl nr n) → R+ (S nl) nr (S n)
+  rsr : (nl nr n : ℕ) (r : R+ nl nr n) → R+ nl (S nr) (S n)
+
+module Nat where
+  injs : (m n : ℕ) (p : S m ≡ S n) → m ≡ n
+  injs m n refl = refl
+
+module NatSum where
+  zerol : (nr n : ℕ) (r : R+ Z nr n) → nr ≡ n
+  zerol Z Z rz = refl
+  zerol (S nr) (S n) (rsr .0 .nr .n r) = cong S nr n (zerol nr n r)
+
+  zeror : (nl n : ℕ) (r : R+ nl Z n) → nl ≡ n
+  zeror .0 .0 rz = refl
+  zeror .(S nl) .(S n) (rsl nl .0 n r) = cong S nl n (zeror nl n r)
+
+  sum-zerol : (nl nr : ℕ) (r : R+ nl nr Z) → nl ≡ Z
+  sum-zerol .0 .0 rz = refl
+
+  sum-zeror : (nl nr : ℕ) (r : R+ nl nr Z) → nr ≡ Z
+  sum-zeror .0 .0 rz = refl
+
+  module NatPlus where
+    open import Agda.Builtin.Nat using () renaming (_+_ to _+ₙ_)
+    swaps : (nl nr n : ℕ) (p : S nl +ₙ nr ≡ n) → nl +ₙ S nr ≡ n
+    swaps Z nr n p = p
+    swaps (S nl) nr (S n) p = cong S (nl +ₙ S nr) n (swaps nl nr n (Nat.injs (S (nl +ₙ nr)) n p))
+
+    matches : (nl nr n : ℕ) (r : R+ nl nr n) → nl +ₙ nr ≡ n
+    matches .0 .0 .0 rz = refl
+    matches .(S nl) nr .(S n) (rsl nl .nr n r) = cong S (nl +ₙ nr) n (matches nl nr n r)
+    matches nl .(S nr) .(S n) (rsr .nl nr n r) = swaps nl nr (S n) (cong S (nl +ₙ nr) n (matches nl nr n r))
+
 data _+_ (A B : Set) : Set where
   inl : (a : A) → A + B
   inr : (b : B) → A + B
 infixr 6 _+_
 
 data _×_ (A B : Set) : Set where
-  pair : (a : A) → (b : B) → A × B
+  pair : (a : A) (b : B) → A × B
+
+data 𝕃 (A : Set) : Set where
+  nil : 𝕃 A
+  cons : (a : A) (x : 𝕃 A) → 𝕃 A
 
 data 𝕍 (A : Set) : ℕ → Set where
   nil : 𝕍 A Z
-  cons : (a : A) → (n : ℕ) → 𝕍 A n → 𝕍 A (S n)
+  cons : (a : A) (n : ℕ) (v : 𝕍 A n) → 𝕍 A (S n)
+
+data 𝕍+ (A B : Set) : (nl nr n : ℕ) → Set where
+  nil : 𝕍+ A B Z Z Z
+  consl : (a : A) (nl nr n : ℕ) (v : 𝕍+ A B nl nr n) → 𝕍+ A B (S nl) nr (S n)
+  consr : (b : B) (nl nr n : ℕ) (v : 𝕍+ A B nl nr n) → 𝕍+ A B nl (S nr) (S n)
 
 record Iso (A B : Set) : Set where
   field
@@ -168,3 +215,40 @@ module VecIso where
     idB : (x : 𝕍 B n) → to (from x) ≡ x
     idB nil = refl
     idB (cons b n x) rewrite idB-AB b | Vec.Props.map-compose B A B b→a a→b n x | Vec.Props.map-id B (a→b ∘ b→a) idB-AB n x = refl
+
+record 𝕍R (A : Set) : Set where
+  field
+    len : ℕ
+    vec : 𝕍 A len
+
+record 𝕍+R (A B : Set) : Set where
+  field
+    lenl lenr len : ℕ
+    rel : R+ lenl lenr len
+    vec : 𝕍+ A B lenl lenr len
+
+module ListVec {A : Set} where
+  index-cons : A → 𝕍R A → 𝕍R A
+  index-cons a record { len = len ; vec = vec } = record { len = S len ; vec = cons a _ vec }
+
+  index : 𝕃 A → 𝕍R A
+  index nil = record { len = Z ; vec = nil }
+  index (cons a x) = index-cons a (index x)
+
+  forget-cons : A → 𝕃 A → 𝕃 A
+  forget-cons a x = cons a x
+
+  forget : 𝕍R A → 𝕃 A
+  forget record { len = .0 ; vec = nil } = nil
+  forget record { len = .(S n) ; vec = (cons a n vec) } = forget-cons a (forget record { len = _ ; vec = vec })
+
+  iso : Iso (𝕃 A) (𝕍R A)
+  iso = record { to = index ; from = forget ; idA = idA ; idB = idB }
+    where
+    idA : (x : 𝕃 A) → forget (index x) ≡ x
+    idA nil = refl
+    idA (cons a x) = cong (cons a) _ _ (idA x)
+
+    idB : (x : 𝕍R A) → index (forget x) ≡ x
+    idB record { len = .0 ; vec = nil } = refl
+    idB record { len = .(S n) ; vec = (cons a n vec) } rewrite idB record { len = n ; vec = vec } = refl
