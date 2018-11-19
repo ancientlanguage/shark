@@ -205,6 +205,41 @@ module PairIso where
     idB : (x : C × B) → to (from x) ≡ x
     idB (pair c b) rewrite idB-AB b = refl
 
+module List where
+  map : (A B : Set) (f : A → B) (x : 𝕃 A) → 𝕃 B
+  map A B f nil = nil
+  map A B f (cons a x) = cons (f a) (map A B f x)
+
+  module Map where
+    id : (A : Set) (f : A → A) (f-id : (a : A) → f a ≡ a) (x : 𝕃 A) → map A A f x ≡ x
+    id A f f-id nil = refl
+    id A f f-id (cons a x) rewrite f-id a | id A f f-id x = refl
+
+    compose : (A B C : Set) (f : A → B) (g : B → C) (x : 𝕃 A) → map B C g (map A B f x) ≡ map A C (g ∘ f) x
+    compose A B C f g nil = refl
+    compose A B C f g (cons a x) rewrite compose A B C f g x = refl
+
+module ListIso where
+  each : (A B : Set) (i : Iso A B) → Iso (𝕃 A) (𝕃 B)
+  each A B
+    record { to = a→b ; from = b→a ; idA = idA-AB ; idB = idB-AB }
+    =
+    record { to = to ; from = from ; idA = idA ; idB = idB }
+    where
+    to : (x : 𝕃 A) → 𝕃 B
+    to = List.map A B a→b
+
+    from : (x : 𝕃 B) → 𝕃 A
+    from = List.map B A b→a
+
+    idA : (x : 𝕃 A) → from (to x) ≡ x
+    idA nil = refl
+    idA (cons a x) rewrite idA-AB a | List.Map.compose A B A a→b b→a x | List.Map.id A (b→a ∘ a→b) idA-AB x = refl
+
+    idB : (x : 𝕃 B) → to (from x) ≡ x
+    idB nil = refl
+    idB (cons b x) rewrite idB-AB b | List.Map.compose B A B b→a a→b x | List.Map.id B (a→b ∘ b→a) idB-AB x = refl
+
 module Vec where
   map : (A B : Set) (f : A → B) (n : ℕ) (v : 𝕍 A n) → 𝕍 B n
   map A B f .0 nil = nil
@@ -394,11 +429,11 @@ module VecSplit (A B : Set) where
     idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; lefts = lefts ; rights = (cons a .nr rights) ; choices = (consr b .lenl nr n choices) }
       rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices } = refl
 
--- bijection between lists of sums and an alternate representation for a split-sum vector which uses the sum relation instead of a list of choices
-module VecSumR (A B : Set) where
+module _ (A B : Set) where
   data 𝕍R+ : (nl nr n : ℕ) → Set where
     vr+ : (nl nr n : ℕ) (r : R+ nl nr n) (as : 𝕍 A nl) (bs : 𝕍 B nr) → 𝕍R+ nl nr n
 
+  -- represent a vector of sums as two separate vectors of each type and a sum relation to express the way to combine the elements into a single list
   record 𝕍R+R : Set where
     field
       lenl lenr len : ℕ
@@ -406,7 +441,10 @@ module VecSumR (A B : Set) where
       lefts : 𝕍 A lenl
       rights : 𝕍 B lenr
 
-  index-consl : A → 𝕍R+R → 𝕍R+R
+-- bijection between lists of sums and an alternate representation for a split-sum vector which uses the sum relation instead of a list of choices
+module VecSumR (A B : Set) where
+
+  index-consl : A → 𝕍R+R A B → 𝕍R+R A B
   index-consl a record { lenl = lenl ; lenr = lenr ; len = len ; rel = rel ; lefts = lefts ; rights = rights } =
     record
       { lenl = _
@@ -417,7 +455,7 @@ module VecSumR (A B : Set) where
       ; rights = rights
       }
 
-  index-consr : B → 𝕍R+R → 𝕍R+R
+  index-consr : B → 𝕍R+R A B → 𝕍R+R A B
   index-consr b record { lenl = lenl ; lenr = lenr ; len = len ; rel = rel ; lefts = lefts ; rights = rights } =
     record
       { lenl = _
@@ -428,7 +466,7 @@ module VecSumR (A B : Set) where
       ; rights = cons b _ rights
       }
 
-  index : (x : 𝕃 (A + B)) → 𝕍R+R
+  index : (x : 𝕃 (A + B)) → 𝕍R+R A B
   index nil = record
                 { lenl = _
                 ; lenr = _
@@ -440,14 +478,14 @@ module VecSumR (A B : Set) where
   index (cons (inl a) x) = index-consl a (index x)
   index (cons (inr b) x) = index-consr b (index x)
 
-  forget : 𝕍R+R → 𝕃 (A + B)
+  forget : 𝕍R+R A B → 𝕃 (A + B)
   forget record { lenl = .0 ; lenr = .0 ; len = .0 ; rel = rz ; lefts = nil ; rights = nil } = nil
   forget record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; rel = (rsl nl .lenr n rel) ; lefts = (cons a .nl lefts) ; rights = rights }
     = cons (inl a) (forget record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights }) 
   forget record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; rel = (rsr .lenl nr n rel) ; lefts = lefts ; rights = (cons b .nr rights) }
     = cons (inr b) (forget record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights })
 
-  iso : Iso (𝕃 (A + B)) 𝕍R+R
+  iso : Iso (𝕃 (A + B)) (𝕍R+R A B)
   iso = record { to = index ; from = forget ; idA = idA ; idB = idB }
     where
     idA : (a : 𝕃 (A + B)) → forget (index a) ≡ a
@@ -455,9 +493,52 @@ module VecSumR (A B : Set) where
     idA (cons (inl a) as) rewrite idA as = refl
     idA (cons (inr b) as) rewrite idA as = refl
 
-    idB : (b : 𝕍R+R) → index (forget b) ≡ b
+    idB : (b : 𝕍R+R A B) → index (forget b) ≡ b
     idB record { lenl = .0 ; lenr = .0 ; len = .0 ; rel = rz ; lefts = nil ; rights = nil } = refl
     idB record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; rel = (rsl nl .lenr n rel) ; lefts = (cons a .nl lefts) ; rights = rights }
       rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights } = refl
     idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; rel = (rsr .lenl nr n rel) ; lefts = lefts ; rights = (cons a .nr rights) }
       rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights } = refl
+
+module VecSumROver (A B : Set) (isoAB : Iso A B) (C : Set) where
+  left : Iso (𝕍R+R A C) (𝕍R+R B C)
+  left = final
+    where
+    isoAC-BC : Iso (A + C) (B + C)
+    isoAC-BC = SumIso.over-inl _ _ isoAB _
+
+    listIso : Iso (𝕃 (A + C)) (𝕃 (B + C))
+    listIso = ListIso.each _ _ isoAC-BC
+
+    rightIso : Iso (𝕃 (B + C)) (𝕍R+R B C)
+    rightIso = VecSumR.iso B C
+
+    leftIso : Iso (𝕍R+R A C) (𝕃 (A + C))
+    leftIso = Equiv.sym _ _ (VecSumR.iso A C)
+
+    midleft : Iso (𝕍R+R A C) (𝕃 (B + C))
+    midleft = Equiv.trans _ _ _ leftIso listIso
+
+    final : Iso (𝕍R+R A C) (𝕍R+R B C)
+    final = Equiv.trans _ _ _ midleft rightIso
+
+  right : Iso (𝕍R+R C A) (𝕍R+R C B)
+  right = final
+    where
+    isoSum : Iso (C + A) (C + B)
+    isoSum = SumIso.over-inr _ _ isoAB _
+
+    listIso : Iso (𝕃 (C + A)) (𝕃 (C + B))
+    listIso = ListIso.each _ _ isoSum
+
+    rightIso : Iso (𝕃 (C + B)) (𝕍R+R C B)
+    rightIso = VecSumR.iso C B
+
+    leftIso : Iso (𝕍R+R C A) (𝕃 (C + A))
+    leftIso = Equiv.sym _ _ (VecSumR.iso C A)
+
+    midleft : Iso (𝕍R+R C A) (𝕃 (C + B))
+    midleft = Equiv.trans _ _ _ leftIso listIso
+
+    final : Iso (𝕍R+R C A) (𝕍R+R C B)
+    final = Equiv.trans _ _ _ midleft rightIso
