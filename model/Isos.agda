@@ -224,8 +224,13 @@ record 𝕍R (A : Set) : Set where
 record 𝕍+R (A B : Set) : Set where
   field
     lenl lenr len : ℕ
-    rel : R+ lenl lenr len
     vec : 𝕍+ A B lenl lenr len
+
+module Vec+ where
+  plus-rel : (A B : Set) (nl nr n : ℕ) → 𝕍+ A B nl nr n → R+ nl nr n
+  plus-rel A B .0 .0 .0 nil = rz
+  plus-rel A B .(S nl) nr .(S n) (consl a nl .nr n v) = rsl nl nr n (plus-rel A B nl nr n v)
+  plus-rel A B nl .(S nr) .(S n) (consr b .nl nr n v) = rsr nl nr n (plus-rel A B nl nr n v)
 
 module ListVec {A : Set} where
   index-cons : A → 𝕍R A → 𝕍R A
@@ -252,3 +257,36 @@ module ListVec {A : Set} where
     idB : (x : 𝕍R A) → index (forget x) ≡ x
     idB record { len = .0 ; vec = nil } = refl
     idB record { len = .(S n) ; vec = (cons a n vec) } rewrite idB record { len = n ; vec = vec } = refl
+
+module VecSum (A B : Set) where
+  index-consl : A → 𝕍+R A B → 𝕍+R A B
+  index-consl a record { lenl = lenl ; lenr = lenr ; len = len ; vec = vec } = record { lenl = _ ; lenr = _ ; len = _ ; vec = consl a _ _ _ vec }
+
+  index-consr : B → 𝕍+R A B → 𝕍+R A B
+  index-consr b record { lenl = lenl ; lenr = lenr ; len = len ; vec = vec } = record { lenl = _ ; lenr = _ ; len = _ ; vec = consr b _ _ _ vec }
+
+  index : 𝕍R (A + B) → 𝕍+R A B
+  index record { len = .0 ; vec = nil } = record { lenl = Z ; lenr = Z ; len = Z ; vec = nil }
+  index record { len = .(S n) ; vec = (cons (inl a) n vec) } = index-consl a (index record { len = _ ; vec = vec })
+  index record { len = .(S n) ; vec = (cons (inr b) n vec) } = index-consr b (index record { len = _ ; vec = vec })
+
+  forget-cons : (A + B) → 𝕍R (A + B) → 𝕍R (A + B)
+  forget-cons x record { len = len ; vec = vec } = record { len = _ ; vec = cons x _ vec }
+
+  forget : 𝕍+R A B → 𝕍R (A + B)
+  forget record { lenl = .0 ; lenr = .0 ; len = .0 ; vec = nil } = record { len = _ ; vec = nil }
+  forget record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; vec = (consl a nl .lenr n vec) } = forget-cons (inl a) (forget record { lenl = _ ; lenr = _ ; len = _ ; vec = vec})
+  forget record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; vec = (consr b .lenl nr n vec) } = forget-cons (inr b) (forget record { lenl = _ ; lenr = _ ; len = _ ; vec = vec})
+
+  iso : Iso (𝕍R (A + B)) (𝕍+R A B)
+  iso = record { to = index ; from = forget ; idA = idA ; idB = idB }
+    where
+    idA : (a : 𝕍R (A + B)) → forget (index a) ≡ a
+    idA record { len = .0 ; vec = nil } = refl
+    idA record { len = .(S n) ; vec = (cons (inl a) n vec) } rewrite idA record { len = _ ; vec = vec } = refl
+    idA record { len = .(S n) ; vec = (cons (inr b) n vec) } rewrite idA record { len = _ ; vec = vec } = refl
+
+    idB : (b : 𝕍+R A B) → index (forget b) ≡ b
+    idB record { lenl = .0 ; lenr = .0 ; len = .0 ; vec = nil } = refl
+    idB record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; vec = (consl a nl .lenr n vec) } rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; vec = vec } = refl
+    idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; vec = (consr b .lenl nr n vec) } rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; vec = vec } = refl
