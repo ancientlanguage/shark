@@ -1,7 +1,7 @@
 module Isos where
 
 open import Agda.Builtin.Nat using () renaming (Nat to ℕ; zero to Z; suc to S)
-open import Agda.Builtin.Equality
+open import Agda.Builtin.Equality using (_≡_; refl)
 
 _∘_ : {A B C : Set} (g : B → C) (f : A → B) → (A → C)
 g ∘ f = λ x → g (f x)
@@ -393,3 +393,71 @@ module VecSplit (A B : Set) where
       rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices } = refl
     idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; lefts = lefts ; rights = (cons a .nr rights) ; choices = (consr b .lenl nr n choices) }
       rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices } = refl
+
+-- bijection between lists of sums and an alternate representation for a split-sum vector which uses the sum relation instead of a list of choices
+module VecSumR (A B : Set) where
+  data 𝕍R+ : (nl nr n : ℕ) → Set where
+    vr+ : (nl nr n : ℕ) (r : R+ nl nr n) (as : 𝕍 A nl) (bs : 𝕍 B nr) → 𝕍R+ nl nr n
+
+  record 𝕍R+R : Set where
+    field
+      lenl lenr len : ℕ
+      rel : R+ lenl lenr len
+      lefts : 𝕍 A lenl
+      rights : 𝕍 B lenr
+
+  index-consl : A → 𝕍R+R → 𝕍R+R
+  index-consl a record { lenl = lenl ; lenr = lenr ; len = len ; rel = rel ; lefts = lefts ; rights = rights } =
+    record
+      { lenl = _
+      ; lenr = _
+      ; len = _
+      ; rel = rsl _ _ _ rel
+      ; lefts = cons a _ lefts
+      ; rights = rights
+      }
+
+  index-consr : B → 𝕍R+R → 𝕍R+R
+  index-consr b record { lenl = lenl ; lenr = lenr ; len = len ; rel = rel ; lefts = lefts ; rights = rights } =
+    record
+      { lenl = _
+      ; lenr = _
+      ; len = _
+      ; rel = rsr _ _ _ rel
+      ; lefts = lefts
+      ; rights = cons b _ rights
+      }
+
+  index : (x : 𝕃 (A + B)) → 𝕍R+R
+  index nil = record
+                { lenl = _
+                ; lenr = _
+                ; len = Z
+                ; rel = rz
+                ; lefts = nil
+                ; rights = nil
+                }
+  index (cons (inl a) x) = index-consl a (index x)
+  index (cons (inr b) x) = index-consr b (index x)
+
+  forget : 𝕍R+R → 𝕃 (A + B)
+  forget record { lenl = .0 ; lenr = .0 ; len = .0 ; rel = rz ; lefts = nil ; rights = nil } = nil
+  forget record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; rel = (rsl nl .lenr n rel) ; lefts = (cons a .nl lefts) ; rights = rights }
+    = cons (inl a) (forget record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights }) 
+  forget record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; rel = (rsr .lenl nr n rel) ; lefts = lefts ; rights = (cons b .nr rights) }
+    = cons (inr b) (forget record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights })
+
+  iso : Iso (𝕃 (A + B)) 𝕍R+R
+  iso = record { to = index ; from = forget ; idA = idA ; idB = idB }
+    where
+    idA : (a : 𝕃 (A + B)) → forget (index a) ≡ a
+    idA nil = refl
+    idA (cons (inl a) as) rewrite idA as = refl
+    idA (cons (inr b) as) rewrite idA as = refl
+
+    idB : (b : 𝕍R+R) → index (forget b) ≡ b
+    idB record { lenl = .0 ; lenr = .0 ; len = .0 ; rel = rz ; lefts = nil ; rights = nil } = refl
+    idB record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; rel = (rsl nl .lenr n rel) ; lefts = (cons a .nl lefts) ; rights = rights }
+      rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights } = refl
+    idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; rel = (rsr .lenl nr n rel) ; lefts = lefts ; rights = (cons a .nr rights) }
+      rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; rel = rel ; lefts = lefts ; rights = rights } = refl
