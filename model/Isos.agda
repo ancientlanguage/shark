@@ -9,6 +9,11 @@ _∘_ : {A B C : Set} (g : B → C) (f : A → B) → (A → C)
 cong : {A B : Set} (f : A → B) (x y : A) (p : x ≡ y) → f x ≡ f y
 cong _ _ _ refl = refl
 
+data 𝟘 : Set where
+
+record 𝟙 : Set where
+  constructor <>
+
 data R+ : (nl nr n : ℕ) → Set where
   rz : R+ Z Z Z
   rsl : (nl nr n : ℕ) (r : R+ nl nr n) → R+ (S nl) nr (S n)
@@ -290,3 +295,74 @@ module VecSum (A B : Set) where
     idB record { lenl = .0 ; lenr = .0 ; len = .0 ; vec = nil } = refl
     idB record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; vec = (consl a nl .lenr n vec) } rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; vec = vec } = refl
     idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; vec = (consr b .lenl nr n vec) } rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; vec = vec } = refl
+
+record 𝕍𝕊 (A B : Set) : Set where
+  field
+    lenl lenr len : ℕ
+    lefts : 𝕍 A lenl
+    rights : 𝕍 B lenr
+    choices : 𝕍+ 𝟙 𝟙 lenl lenr len
+
+module VecSplit (A B : Set) where
+  split-consl : A → 𝕍𝕊 A B → 𝕍𝕊 A B
+  split-consl a record { lenl = lenl ; lenr = lenr ; len = len ; lefts = lefts ; rights = rights ; choices = choices } =
+    record
+      { lenl = _
+      ; lenr = _
+      ; len = _
+      ; lefts = cons a _ lefts
+      ; rights = rights
+      ; choices = consl _ _ _ _ choices
+      }
+
+  split-consr : B → 𝕍𝕊 A B → 𝕍𝕊 A B
+  split-consr b record { lenl = lenl ; lenr = lenr ; len = len ; lefts = lefts ; rights = rights ; choices = choices } =
+    record
+      { lenl = _
+      ; lenr = _
+      ; len = _
+      ; lefts = lefts
+      ; rights = cons b _ rights
+      ; choices = consr _ _ _ _ choices
+      }
+
+  split : 𝕍+R A B → 𝕍𝕊 A B
+  split record { lenl = .0 ; lenr = .0 ; len = .0 ; vec = nil } =
+    record
+      { lenl = _
+      ; lenr = _
+      ; len = _
+      ; lefts = nil
+      ; rights = nil
+      ; choices = nil
+      }
+  split record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; vec = (consl a nl .lenr n vec) } = split-consl a (split record { lenl = _ ; lenr = _ ; len = _ ; vec = vec})
+  split record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; vec = (consr b .lenl nr n vec) } = split-consr b (split record { lenl = _ ; lenr = _ ; len = _ ; vec = vec})
+
+  join-consl : A → 𝕍+R A B → 𝕍+R A B
+  join-consl a record { lenl = lenl ; lenr = lenr ; len = len ; vec = vec } = record { lenl = _ ; lenr = _ ; len = _ ; vec = consl a _ _ _ vec }
+
+  join-consr : B → 𝕍+R A B → 𝕍+R A B
+  join-consr b record { lenl = lenl ; lenr = lenr ; len = len ; vec = vec } = record { lenl = _ ; lenr = _ ; len = _ ; vec = consr b _ _ _ vec }
+
+  join : 𝕍𝕊 A B → 𝕍+R A B
+  join record { lenl = .0 ; lenr = .0 ; len = .0 ; lefts = lefts ; rights = rights ; choices = nil } = record { lenl = _ ; lenr = _ ; len = _ ; vec = nil }
+  join record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; lefts = (cons a .nl lefts) ; rights = rights ; choices = (consl <> nl .lenr n choices) } =
+    join-consl a (join record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices } )
+  join record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; lefts = lefts ; rights = (cons b .nr rights) ; choices = (consr <> .lenl nr n choices) } =
+    join-consr b (join record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices })
+
+  iso : Iso (𝕍+R A B) (𝕍𝕊 A B)
+  iso = record { to = split ; from = join ; idA = idA ; idB = idB }
+    where
+    idA : (a : 𝕍+R A B) → join (split a) ≡ a
+    idA record { lenl = .0 ; lenr = .0 ; len = .0 ; vec = nil } = refl
+    idA record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; vec = (consl a nl .lenr n vec) } rewrite idA record { lenl = _ ; lenr = _ ; len = _ ; vec = vec } = refl
+    idA record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; vec = (consr b .lenl nr n vec) } rewrite idA record { lenl = _ ; lenr = _ ; len = _ ; vec = vec } = refl
+
+    idB : (b : 𝕍𝕊 A B) → split (join b) ≡ b
+    idB record { lenl = .0 ; lenr = .0 ; len = .0 ; lefts = nil ; rights = nil ; choices = nil } = refl
+    idB record { lenl = .(S nl) ; lenr = lenr ; len = .(S n) ; lefts = (cons a₁ .nl lefts) ; rights = rights ; choices = (consl a nl .lenr n choices) }
+      rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices } = refl
+    idB record { lenl = lenl ; lenr = .(S nr) ; len = .(S n) ; lefts = lefts ; rights = (cons a .nr rights) ; choices = (consr b .lenl nr n choices) }
+      rewrite idB record { lenl = _ ; lenr = _ ; len = _ ; lefts = lefts ; rights = rights ; choices = choices } = refl
