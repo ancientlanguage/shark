@@ -6,8 +6,12 @@ open import Agda.Builtin.Equality using (_≡_; refl)
 _∘_ : {A B C : Set} (g : B → C) (f : A → B) → (A → C)
 g ∘ f = λ x → g (f x)
 
-cong : {A B : Set} (f : A → B) (x y : A) (p : x ≡ y) → f x ≡ f y
-cong _ _ _ refl = refl
+module Eq where
+  cong : {A B : Set} (f : A → B) (x y : A) (p : x ≡ y) → f x ≡ f y
+  cong _ _ _ refl = refl
+
+  sym : {A : Set} (x y : A) (p : x ≡ y) → y ≡ x
+  sym _ _ refl = refl
 
 data 𝟘 : Set where
 
@@ -29,12 +33,12 @@ module NatSum where
   -- when left is zero, then right equals the sum
   zerol : (nr n : ℕ) (r : R+ Z nr n) → nr ≡ n
   zerol Z Z rz = refl
-  zerol (S nr) (S n) (rsr .0 .nr .n r) = cong S nr n (zerol nr n r)
+  zerol (S nr) (S n) (rsr .0 .nr .n r) = Eq.cong S nr n (zerol nr n r)
 
   -- when right is zero, then left equals the sum
   zeror : (nl n : ℕ) (r : R+ nl Z n) → nl ≡ n
   zeror .0 .0 rz = refl
-  zeror .(S nl) .(S n) (rsl nl .0 n r) = cong S nl n (zeror nl n r)
+  zeror .(S nl) .(S n) (rsl nl .0 n r) = Eq.cong S nl n (zeror nl n r)
 
   -- when sum is zero, then left is zero
   sum-zerol : (nl nr : ℕ) (r : R+ nl nr Z) → nl ≡ Z
@@ -50,13 +54,13 @@ module NatSum where
     -- swap the place of the successor from the right side to the left side of the plus expression
     swaps : (nl nr n : ℕ) (p : S nl +ₙ nr ≡ n) → nl +ₙ S nr ≡ n
     swaps Z nr n p = p
-    swaps (S nl) nr (S n) p = cong S _ _ (swaps _ _ _ (Nat.injs _ _ p))
+    swaps (S nl) nr (S n) p = Eq.cong S _ _ (swaps _ _ _ (Nat.injs _ _ p))
 
     -- create an equality from a sum relation
     matches : (nl nr n : ℕ) (r : R+ nl nr n) → nl +ₙ nr ≡ n
     matches .0 .0 .0 rz = refl
-    matches .(S nl) nr .(S n) (rsl nl .nr n r) = cong S _ _ (matches _ _ _ r)
-    matches nl .(S nr) .(S n) (rsr .nl nr n r) = swaps _ _ (S n) (cong S _ _ (matches _ _ _ r))
+    matches .(S nl) nr .(S n) (rsl nl .nr n r) = Eq.cong S _ _ (matches _ _ _ r)
+    matches nl .(S nr) .(S n) (rsr .nl nr n r) = swaps _ _ (S n) (Eq.cong S _ _ (matches _ _ _ r))
 
 data _+_ (A B : Set) : Set where
   inl : (a : A) → A + B
@@ -316,7 +320,7 @@ module ListVec {A : Set} where
     where
     idA : (x : 𝕃 A) → forget (index x) ≡ x
     idA nil = refl
-    idA (cons a x) = cong (cons a) _ _ (idA x)
+    idA (cons a x) = Eq.cong (cons a) _ _ (idA x)
 
     idB : (x : 𝕍R A) → index (forget x) ≡ x
     idB record { len = .0 ; vec = nil } = refl
@@ -542,3 +546,113 @@ module VecSumROver (A B : Set) (isoAB : Iso A B) (C : Set) where
 
     final : Iso (𝕍R+R C A) (𝕍R+R C B)
     final = Equiv.trans _ _ _ midleft rightIso
+
+
+record 𝕃+ (A : Set) : Set where
+  field
+    first : A
+    rest : 𝕃 A
+
+record 𝔾R (A B : Set) : Set where
+  field
+    initial : 𝕃 B
+    core : 𝕃 (𝕃+ A × 𝕃+ B)
+    final : 𝕃 A
+
+module GroupAdjacent (A B : Set) where
+
+  group-consl : A → 𝔾R A B → 𝔾R A B
+  group-consl a record { initial = nil ; core = nil ; final = final }
+    = record { initial = nil ; core = nil ; final = cons a final }
+  group-consl a record { initial = nil ; core = (cons (pair record { first = a2 ; rest = as } bs) core) ; final = final }
+    = record { initial = nil ; core = cons (pair record { first = a ; rest = cons a2 as } bs) core ; final = final }
+  group-consl a record { initial = cons b initial ; core = core ; final = final }
+    = record { initial = nil ; core = cons (pair record { first = a ; rest = nil } record { first = b ; rest = initial }) core ; final = final }
+
+  group-consr : B → 𝔾R A B → 𝔾R A B
+  group-consr b record { initial = initial ; core = core ; final = final } = record { initial = cons b initial ; core = core ; final = final }
+
+  group : 𝕃 (A + B) → 𝔾R A B
+  group nil = record { initial = nil ; core = nil ; final = nil }
+  group (cons (inl a) x) = group-consl a (group x)
+  group (cons (inr b) x) = group-consr b (group x)
+
+  flatten-cons : (A + B) → 𝕃 (A + B) → 𝕃 (A + B)
+  flatten-cons x xs = cons x xs
+
+  flatten-core3 : 𝕃 B → 𝕃 (A + B) → 𝕃 (A + B)
+  flatten-core3 nil xs = xs
+  flatten-core3 (cons b bs) xs = flatten-cons (inr b) (flatten-core3 bs xs)
+
+  flatten-core2 : 𝕃 A → 𝕃+ B → 𝕃 (A + B) → 𝕃 (A + B)
+  flatten-core2 nil record { first = b ; rest = rest } xs = flatten-cons (inr b) (flatten-core3 rest xs)
+  flatten-core2 (cons a as) bs xs = flatten-cons (inl a) (flatten-core2 as bs xs)
+
+  flatten-core : (𝕃+ A × 𝕃+ B) → 𝕃 (A + B) → 𝕃 (A + B)
+  flatten-core (pair record { first = a ; rest = rest } bs) xs = flatten-cons (inl a) (flatten-core2 rest bs xs) 
+
+  flatten : 𝔾R A B → 𝕃 (A + B)
+  flatten record { initial = nil ; core = nil ; final = nil } = nil
+  flatten record { initial = nil ; core = nil ; final = (cons a final) } = flatten-cons (inl a) (flatten record { initial = nil ; core = nil ; final = final })
+  flatten record { initial = nil ; core = (cons x core) ; final = final } = flatten-core x (flatten record { initial = nil ; core = core ; final = final })
+  flatten record { initial = (cons b initial) ; core = core ; final = final } = flatten-cons (inr b) (flatten record { initial = initial ; core = core ; final = final})
+
+  iso : Iso (𝕃 (A + B)) (𝔾R A B)
+  iso = record { to = group ; from = flatten ; idA = idA ; idB = idB }
+    where
+    aux2 : (bs : 𝕃 B) (core : 𝕃 (𝕃+ A × 𝕃+ B)) (final : 𝕃 A) → flatten-core3 bs (flatten (record { initial = nil ; core = core ; final = final })) ≡ flatten (record { initial = bs ; core = core ; final = final })
+    aux2 nil core final = refl
+    aux2 (cons a bs) core final = Eq.cong (cons (inr a)) _ _ (aux2 bs core final)
+
+    aux1 : (a : A) (xs : 𝕃 (A + B)) (g : 𝔾R A B) (p : flatten g ≡ xs) → flatten (group-consl a g) ≡ cons (inl a) xs
+    aux1 a xs record { initial = nil ; core = nil ; final = final } p = Eq.cong (cons (inl a)) _ _ p
+    aux1 a xs record { initial = nil ; core = (cons (pair record { first = a2 ; rest = as } bs) core) ; final = final } p = Eq.cong (cons (inl a)) _ _ p
+    aux1 a xs record { initial = (cons b nil) ; core = core ; final = final } p = Eq.cong (cons (inl a)) _ _ p
+    aux1 a xs record { initial = (cons b (cons a₁ bs)) ; core = core ; final = final } p rewrite aux2 bs core final | p = refl
+
+    idA : (xs : 𝕃 (A + B)) → flatten (group xs) ≡ xs
+    idA nil = refl
+    idA (cons (inl a) xs) = aux1 a xs (group xs) (idA xs)
+    idA (cons (inr b) xs) rewrite idA xs = refl
+
+    auxb1 : (b : B) (bs : 𝕃 B) (core : 𝕃 (𝕃+ A × 𝕃+ B))
+          (final : 𝕃 A) →
+        group
+        (flatten (record { initial = nil ; core = core ; final = final }))
+        ≡ record { initial = nil ; core = core ; final = final } →
+        group-consr b
+        (group
+         (flatten-core3 bs
+          (flatten
+           (record { initial = nil ; core = core ; final = final }))))
+        ≡ record { initial = cons b bs ; core = core ; final = final }
+    auxb1 b nil core final p = Eq.cong (group-consr b) _ _ p
+    auxb1 b (cons b2 bs) core final p = Eq.cong (group-consr b) _ _ (auxb1 b2 bs core final p)
+
+    auxb2 : (a : A) (as : 𝕃 A) (b : 𝕃+ B)
+          (core : 𝕃 (𝕃+ A × 𝕃+ B)) (final : 𝕃 A) →
+        group
+        (flatten (record { initial = nil ; core = core ; final = final }))
+        ≡ record { initial = nil ; core = core ; final = final } →
+        group-consl a
+        (group
+         (flatten-core2 as b
+          (flatten
+           (record { initial = nil ; core = core ; final = final }))))
+        ≡
+        record
+        { initial = nil
+        ; core = cons (pair (record { first = a ; rest = as }) b) core
+        ; final = final
+        }
+    auxb2 a nil record { first = b ; rest = bs } core final p = Eq.cong (group-consl a) _ _ (auxb1 b bs core final p)
+    auxb2 a (cons a2 as) b core final p = Eq.cong (group-consl a) _ _ (auxb2 a2 as b core final p)
+
+    idB : (g : 𝔾R A B) → group (flatten g) ≡ g
+    idB record { initial = nil ; core = nil ; final = nil } = refl
+    idB record { initial = nil ; core = nil ; final = (cons a final) } rewrite idB record { initial = nil ; core = nil ; final = final } = refl
+    idB record { initial = nil ; core = (cons (pair record { first = a ; rest = nil } record { first = b ; rest = bs }) core) ; final = final } = 
+      Eq.cong (group-consl a) _ _ (auxb1 b bs core final (idB record { initial = nil ; core = core ; final = final }))
+    idB record { initial = nil ; core = (cons (pair record { first = a ; rest = (cons a2 as) } b) core) ; final = final } =
+      Eq.cong (group-consl a) _ _ (auxb2 a2 as b core final (idB record { initial = nil ; core = core ; final = final }))
+    idB record { initial = (cons a initial) ; core = core ; final = final } rewrite idB record { initial = initial ; core = core ; final = final } = refl
