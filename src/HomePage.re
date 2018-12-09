@@ -14,11 +14,5 @@ let make = _children => {
   ...component,
   reducer,
   initialState: () => Type.Or([| Type.Unit, Type.Unit, Type.Unit, |]),
-  render: self =>
-    switch (self.state) {
-    | Type.Unit => <TypeUnit />
-    | Type.Or(orChildren) => <TypeOr orChildren />
-    | Type.And(_) => <div>(ReasonReact.string("And!"))</div>
-    | Type.Array(_) => <div>(ReasonReact.string("Array!"))</div>
-    },
+  render: self => <TypeRoot root=self.state />
 };
