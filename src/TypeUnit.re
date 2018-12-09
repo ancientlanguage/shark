@@ -1,4 +1,4 @@
-let component = ReasonReact.statelessComponent("Unit");
+let component = ReasonReact.statelessComponent("TypeUnit");
 
 let make = _children => {
   ...component,

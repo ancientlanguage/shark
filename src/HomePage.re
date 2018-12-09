@@ -1,17 +1,11 @@
-type sharkType =
-  | Unit
-  | Or(list(sharkType))
-  | And(list(sharkType))
-  | Array(sharkType, sharkType); /* first ^ second */
-
-type state = sharkType;
+type state = Type.shark;
 
 type action =
   | ChangeType;
 
 let reducer = (action, _state) =>
   switch (action) {
-  | ChangeType => ReasonReact.Update(Unit)
+  | ChangeType => ReasonReact.Update(Type.Unit)
   };
 
 let component = ReasonReact.reducerComponent("HomePage");
@@ -19,12 +13,12 @@ let component = ReasonReact.reducerComponent("HomePage");
 let make = _children => {
   ...component,
   reducer,
-  initialState: () => Unit,
+  initialState: () => Type.Or([| Type.Unit, Type.Unit, Type.Unit, |]),
   render: self =>
     switch (self.state) {
-    | Unit => <Unit />
-    | Or(_) => <div>(ReasonReact.string("Or!"))</div>
-    | And(_) => <div>(ReasonReact.string("And!"))</div>
-    | Array(_) => <div>(ReasonReact.string("Array!"))</div>
+    | Type.Unit => <TypeUnit />
+    | Type.Or(orChildren) => <TypeOr orChildren />
+    | Type.And(_) => <div>(ReasonReact.string("And!"))</div>
+    | Type.Array(_) => <div>(ReasonReact.string("Array!"))</div>
     },
 };
