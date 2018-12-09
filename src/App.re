@@ -1,6 +1,7 @@
 type route =
   | Home
-  | NotFound;
+  | NotFound
+  | Values;
 
 type state = {route};
 
@@ -15,6 +16,7 @@ let reducer = (action, _state) =>
 let mapUrlToRoute = (url: ReasonReact.Router.url) =>
   switch (url.path) {
   | [] => Home
+  | ["values"] => Values
   | _ => NotFound
   };
 
@@ -37,5 +39,6 @@ let make = _children => {
     switch (self.state.route) {
     | Home => <HomePage />
     | NotFound => <NotFound />
+    | Values => <ValuesPage />
     },
 };
