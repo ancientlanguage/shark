@@ -1,0 +1,17 @@
+.Type_tree {
+  background-color: lightblue;
+  margin: 8px;
+}
+
+.Type_unit {
+  background-color: lightcoral;
+  margin: 8px;
+}
+
+.Type_array {
+  background-color: lightgreen;
+  display: flex;
+  flex-direction: row;
+  margin: 8px;
+  border-color: black;
+}

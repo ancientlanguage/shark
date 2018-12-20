@@ -4,6 +4,8 @@ type shark =
   | And(array(shark)) */
   | Array(shark, shark); /* first ^ second */
 
+Utils.requireCSS("src/Type.css");
+
 let unitRef = ref(() => ReasonReact.null);
 let arrayRef = ref((_base, _exp) => ReasonReact.null);
 
@@ -27,15 +29,14 @@ module rec Tree: {
   let make = (_children, ~tree) => {
     ...component,
     render: _self =>
-      <p>
-        (ReasonReact.string("Tree"))
-          (switch (tree) {
-          | Unit => unitRef^();
-          /* | Type.Or(orChildren) => <TypeOr orChildren />
-          | Type.And(_) => <div>(ReasonReact.string("And!"))</div> */
-          | Array(base, exp) => arrayRef^(base, exp);
-          })
-      </p>,
+      <div className="Type_tree">
+        (switch (tree) {
+        | Unit => unitRef^();
+        /* | Type.Or(orChildren) => <TypeOr orChildren />
+        | Type.And(_) => <div>(ReasonReact.string("And!"))</div> */
+        | Array(base, exp) => arrayRef^(base, exp);
+        })
+      </div>,
   };
 }
 and UnitView: {
@@ -58,9 +59,9 @@ and UnitView: {
   let make = (_children) => {
     ...component,
     render: _self =>
-      <p>
+      <div className="Type_unit">
         (ReasonReact.string("Unit!"))
-      </p>,
+      </div>,
   };
 }
 and ArrayView: {
@@ -83,14 +84,9 @@ and ArrayView: {
   let make = (_children, ~base, ~exp) => {
     ...component,
     render: _self =>
-      <div>
-        (ReasonReact.string("Array!"))
-        <div>
-          (ReasonReact.string("Left:"))
-          <Tree tree=base />
-          (ReasonReact.string("Right:"))
-          <Tree tree=exp />
-        </div>
+      <div className="Type_array">
+        <Tree tree=base />
+        <Tree tree=exp />
       </div>,
   };
 };
