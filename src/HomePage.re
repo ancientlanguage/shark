@@ -13,6 +13,6 @@ let component = ReasonReact.reducerComponent("HomePage");
 let make = _children => {
   ...component,
   reducer,
-  initialState: () => Type.Or([| Type.Unit, Type.Unit, Type.Unit, |]),
-  render: self => <TypeRoot root=self.state />
+  initialState: () => Type.Array(Type.Unit, Type.Array(Type.Unit, Type.Unit)),
+  render: self => <Type.Tree tree=self.state />
 };
